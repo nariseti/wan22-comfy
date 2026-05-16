@@ -43,6 +43,7 @@ RUN git clone --depth=1 https://github.com/kijai/ComfyUI-WanVideoWrapper.git && 
 # ── Install all pip packages in one shot ──────────────────────────────────────
 RUN pip install --no-cache-dir \
         gguf ftfy accelerate "opencv-python-headless" imageio-ffmpeg einops \
+        hf_transfer huggingface_hub \
         -r /workspace/ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper/requirements.txt \
         -r /workspace/ComfyUI/custom_nodes/ComfyUI-VideoHelperSuite/requirements.txt \
         -r /workspace/ComfyUI/custom_nodes/ComfyUI-KJNodes/requirements.txt
