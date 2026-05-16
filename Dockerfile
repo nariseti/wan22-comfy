@@ -52,10 +52,14 @@ RUN mkdir /var/run/sshd && \
     echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config && \
     echo 'PasswordAuthentication no' >> /etc/ssh/sshd_config
 
+# ── Entrypoint: inject Vast.ai SSH key then start supervisor ─────────────────
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # ── Supervisor: manages ComfyUI + SSH as services ────────────────────────────
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 WORKDIR /workspace
 EXPOSE 18188 18189 18190 18191 18192 18193 18194 18195 22
 
-CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+ENTRYPOINT ["/entrypoint.sh"]
