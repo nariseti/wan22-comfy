@@ -22,10 +22,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python3.12 -m venv /venv/main
 ENV PATH="/venv/main/bin:$PATH"
 
-# ── Install PyTorch with CUDA 12.4 (wheels bundle their own CUDA runtime) ────
+# ── Install PyTorch with CUDA 12.8 (required for Blackwell B200 SM_100) ─────
 RUN pip install --no-cache-dir \
         torch torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/cu124
+        --index-url https://download.pytorch.org/whl/cu128
 
 # ── Install ComfyUI ───────────────────────────────────────────────────────────
 RUN git clone --depth=1 https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI
@@ -56,6 +56,6 @@ RUN mkdir /var/run/sshd && \
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 WORKDIR /workspace
-EXPOSE 18188 22
+EXPOSE 18188 18189 18190 18191 22
 
 CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
