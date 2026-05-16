@@ -54,7 +54,7 @@ RUN mkdir /var/run/sshd && \
 
 # ── Entrypoint: inject Vast.ai SSH key then start supervisor ─────────────────
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r//' /entrypoint.sh && chmod +x /entrypoint.sh
 
 # ── Supervisor: manages ComfyUI + SSH as services ────────────────────────────
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
