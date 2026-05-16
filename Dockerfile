@@ -7,12 +7,12 @@
 # BAKED IN:  ComfyUI + custom nodes + all pip packages
 # RUNTIME:   model weights (too large; downloaded on first boot or via network volume)
 
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
-# ── System packages ───────────────────────────────────────────────────────────
+# ── System packages (Ubuntu 24.04 has Python 3.12 natively) ──────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3.12 python3.12-venv python3.12-dev python3-pip \
         git curl wget openssh-server supervisor \
