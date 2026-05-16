@@ -22,10 +22,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python3.12 -m venv /venv/main
 ENV PATH="/venv/main/bin:$PATH"
 
-# ── Install PyTorch with CUDA 12.8 (required for Blackwell B200 SM_100) ─────
+# ── Install PyTorch with CUDA 12.4 (smaller image, B200 runs via PTX JIT) ───
 RUN pip install --no-cache-dir \
         torch torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/cu128
+        --index-url https://download.pytorch.org/whl/cu124
 
 # ── Install ComfyUI ───────────────────────────────────────────────────────────
 RUN git clone --depth=1 https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI
