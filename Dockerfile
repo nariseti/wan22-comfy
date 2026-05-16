@@ -56,6 +56,6 @@ RUN mkdir /var/run/sshd && \
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 WORKDIR /workspace
-EXPOSE 18188 18189 18190 18191 22
+EXPOSE 18188 18189 18190 18191 18192 18193 18194 18195 22
 
 CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
