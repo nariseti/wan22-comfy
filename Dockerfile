@@ -7,14 +7,13 @@
 # BAKED IN:  ComfyUI + custom nodes + all pip packages
 # RUNTIME:   model weights (too large; downloaded on first boot or via network volume)
 
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu24.04
+FROM python:3.12-slim-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
-# ── System packages (Ubuntu 24.04 has Python 3.12 natively) ──────────────────
+# ── System packages ───────────────────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3.12 python3.12-venv python3.12-dev python3-pip \
         git curl wget openssh-server supervisor \
         libgl1 libglib2.0-0 ffmpeg \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -23,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python3.12 -m venv /venv/main
 ENV PATH="/venv/main/bin:$PATH"
 
-# ── Install PyTorch (CUDA 12.4) ───────────────────────────────────────────────
+# ── Install PyTorch with CUDA 12.4 (wheels bundle their own CUDA runtime) ────
 RUN pip install --no-cache-dir \
         torch torchvision torchaudio \
         --index-url https://download.pytorch.org/whl/cu124
