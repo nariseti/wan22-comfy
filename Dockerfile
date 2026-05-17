@@ -47,6 +47,9 @@ RUN pip install --no-cache-dir \
         -r /workspace/ComfyUI/custom_nodes/ComfyUI-VideoHelperSuite/requirements.txt \
         -r /workspace/ComfyUI/custom_nodes/ComfyUI-KJNodes/requirements.txt
 
+# ── rclone (for R2 model pull on boot) ───────────────────────────────────────
+RUN curl -fsSL https://rclone.org/install.sh | bash
+
 # ── SSH setup (Vast.ai needs SSH access) ─────────────────────────────────────
 RUN mkdir /var/run/sshd && \
     echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config && \
