@@ -17,7 +17,9 @@ EOF
     BUCKET="${R2_BUCKET:-wan-22}"
     (
         rclone copy "r2:${BUCKET}" /workspace/ComfyUI/models \
-            --transfers 8 --checksum \
+            --transfers 8 \
+            --multi-thread-streams 8 \
+            --no-check-dest \
             --log-file /workspace/r2_pull.log \
             2>&1
         echo "[boot] R2 pull complete." >> /workspace/r2_pull.log

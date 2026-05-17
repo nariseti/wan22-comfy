@@ -197,35 +197,33 @@ def wait_running(token, instance_id, timeout=BOOT_TIMEOUT):
 
 # ── Step 4: Get direct SSH ────────────────────────────────────────────────────
 
-def get_ssh(token, instance_id, retries=8):
-    """Get direct SSH host:port. Tries vastai ssh-url first, falls back to API fields."""
-    log("Getting direct SSH details...")
-    # Try vastai ssh-url (gives real direct port)
-    for _ in range(retries):
-        try:
-            r = subprocess.run(
-                ["vastai", "ssh-url", str(instance_id)],
-                capture_output=True, text=True, timeout=15
-            )
-            url = r.stdout.strip()
-            if url.startswith("ssh://"):
-                parts = url.replace("ssh://root@", "").split(":")
-                host, port = parts[0], int(parts[1])
-                log(f"  SSH (direct): {host}:{port}")
-                return host, port
-        except Exception:
-            pass
+def get_ssh(token, instance_id, retries=20):
+    """Get container SSH host:port from the ports mapping (port 22 → external port).
+    Falls back to proxy SSH (ssh_host:ssh_port) if ports dict not populated yet."""
+    log("Getting SSH details...")
+    deadline = time.time() + retries * 10
+    while time.time() < deadline:
+        inst = get_instance(token, instance_id)
+        if not inst:
+            return None, None
+        # Primary: ports dict — "22/tcp" key maps container port 22 to external port
+        port_map = inst.get("ports") or {}
+        for pk, pm in port_map.items():
+            if pk.startswith("22/") and isinstance(pm, list) and pm:
+                port = int(pm[0].get("HostPort", 0))
+                host = inst.get("public_ipaddr")
+                if host and port:
+                    log(f"  SSH (ports map): {host}:{port}")
+                    return host, port
+        # Fallback: Vast.ai proxy SSH
+        ssh_host = inst.get("ssh_host")
+        ssh_port = inst.get("ssh_port")
+        if ssh_host and ssh_port:
+            log(f"  SSH (proxy): {ssh_host}:{ssh_port}")
+            return ssh_host, int(ssh_port)
+        print(".", end="", flush=True)
         time.sleep(10)
-    # Fallback: use machine_dir_ssh_port from API
-    log("  vastai ssh-url timed out — trying API fallback...")
-    inst = get_instance(token, instance_id)
-    if inst:
-        host = inst.get("public_ipaddr")
-        for port_field in ["machine_dir_ssh_port", "ssh_port"]:
-            port = inst.get(port_field)
-            if host and port:
-                log(f"  SSH ({port_field}): {host}:{port}")
-                return host, int(port)
+    print()
     return None, None
 
 
@@ -254,14 +252,17 @@ def wait_ssh(ssh_key, host, port, retries=40):
 
 
 def ssh_run(ssh_key, host, port, cmd, timeout=120):
-    return subprocess.run(
-        ["ssh", "-i", ssh_key, "-p", str(port),
-         "-o", "StrictHostKeyChecking=no",
-         "-o", "ConnectTimeout=15",
-         "-o", "ServerAliveInterval=30",
-         f"root@{host}", cmd],
-        capture_output=True, text=True, timeout=timeout
-    )
+    try:
+        return subprocess.run(
+            ["ssh", "-i", ssh_key, "-p", str(port),
+             "-o", "StrictHostKeyChecking=no",
+             "-o", "ConnectTimeout=15",
+             "-o", "ServerAliveInterval=30",
+             f"root@{host}", cmd],
+            capture_output=True, text=True, timeout=timeout
+        )
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="TIMEOUT")
 
 
 # ── Step 6: GPU health check ─────────────────────────────────────────────────
@@ -269,10 +270,14 @@ def ssh_run(ssh_key, host, port, cmd, timeout=120):
 def check_gpu(ssh_key, host, port):
     """Confirm GPU is free and not zombie-locked by a previous tenant."""
     log("GPU health check...")
-    r = ssh_run(ssh_key, host, port,
-        "nvidia-smi --query-gpu=name,memory.free,memory.total,utilization.gpu "
-        "--format=csv,noheader,nounits 2>&1",
-        timeout=20)
+    try:
+        r = ssh_run(ssh_key, host, port,
+            "nvidia-smi --query-gpu=name,memory.free,memory.total,utilization.gpu "
+            "--format=csv,noheader,nounits 2>&1",
+            timeout=60)
+    except Exception as e:
+        log(f"  FAIL: nvidia-smi timed out or errored: {e}")
+        return False
     if r.returncode != 0 or not r.stdout.strip():
         log("  FAIL: nvidia-smi did not respond.")
         return False
@@ -299,7 +304,7 @@ EXPECTED_MODELS = [
     f"{COMFY_PATH}/models/text_encoders/umt5-xxl-enc-fp8_e4m3fn.safetensors",
 ]
 
-def wait_models(ssh_key, host, port, timeout=600):
+def wait_models(ssh_key, host, port, timeout=1200):
     log("Waiting for R2 model pull to complete...")
     deadline = time.time() + timeout
     while time.time() < deadline:
