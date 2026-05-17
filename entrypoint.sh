@@ -1,13 +1,6 @@
 #!/bin/bash
-# Inject Vast.ai SSH public key so we can SSH in
-mkdir -p /root/.ssh
-chmod 700 /root/.ssh
-if [ -n "$PUBLIC_KEY" ]; then
-    echo "$PUBLIC_KEY" >> /root/.ssh/authorized_keys
-fi
-chmod 600 /root/.ssh/authorized_keys 2>/dev/null || true
+# Pull models from Cloudflare R2, then hand off to vastai/comfy's own entrypoint
 
-# Pull models from Cloudflare R2 if credentials are set (fast — ~30 sec at 10Gbps)
 if [ -n "$R2_ACCOUNT_ID" ] && [ -n "$R2_ACCESS_KEY_ID" ] && [ -n "$R2_SECRET_ACCESS_KEY" ]; then
     echo "[boot] Pulling models from R2..."
     mkdir -p ~/.config/rclone
@@ -27,4 +20,5 @@ else
     echo "[boot] No R2 credentials — skipping model pull."
 fi
 
-exec /usr/bin/supervisord -n -c /etc/supervisor/conf.d/supervisord.conf
+# Hand off to vastai/comfy's original entrypoint
+exec /opt/ai-dock/bin/init.sh "$@"

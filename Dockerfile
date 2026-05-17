@@ -1,35 +1,13 @@
-# Custom ComfyUI image for Vast.ai — Wan 2.2 nodes pre-baked
-# Base: public NVIDIA CUDA image (buildable anywhere, including GitHub Actions)
+# Wan 2.2 ComfyUI image for Vast.ai
+# Base: vastai/comfy (already cached on all Vast.ai machines — fast pull)
+# Adds: WanVideo nodes + pip packages + rclone pre-baked
+# Runtime: models pulled from Cloudflare R2 on boot (~30 sec)
 #
-# VAST.AI IMAGE NAME (in render_pipeline.py DOCKER_IMAGE):
-#   nariseti/wan22-comfy:latest/jupyter
-#
-# BAKED IN:  ComfyUI + custom nodes + all pip packages
-# RUNTIME:   model weights (too large; downloaded on first boot or via network volume)
+# Vast.ai image name: nariseti/wan22-comfy:latest/jupyter
 
-FROM python:3.12-slim-bookworm
+FROM vastai/comfy:v0.20.1-cuda-12.9-py312
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV PYTHONUNBUFFERED=1
-
-# ── System packages ───────────────────────────────────────────────────────────
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        git curl wget openssh-server supervisor \
-        libgl1 libglib2.0-0 ffmpeg \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# ── Python venv at /venv/main (matches Vast.ai path convention) ───────────────
-RUN python3.12 -m venv /venv/main
-ENV PATH="/venv/main/bin:$PATH"
-
-# ── Install PyTorch with CUDA 12.4 (smaller image, B200 runs via PTX JIT) ───
-RUN pip install --no-cache-dir \
-        torch torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/cu124
-
-# ── Install ComfyUI ───────────────────────────────────────────────────────────
-RUN git clone --depth=1 https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI
-RUN pip install --no-cache-dir -r /workspace/ComfyUI/requirements.txt
 
 # ── Clone custom nodes ────────────────────────────────────────────────────────
 WORKDIR /workspace/ComfyUI/custom_nodes
@@ -39,30 +17,20 @@ RUN git clone --depth=1 https://github.com/kijai/ComfyUI-WanVideoWrapper.git && 
     git clone --depth=1 https://github.com/kijai/ComfyUI-KJNodes.git && \
     git clone --depth=1 https://github.com/ltdrdata/ComfyUI-Manager.git
 
-# ── Install all pip packages in one shot ──────────────────────────────────────
-RUN pip install --no-cache-dir \
-        gguf ftfy accelerate "opencv-python-headless" imageio-ffmpeg einops \
+# ── Install all pip packages ──────────────────────────────────────────────────
+RUN /venv/main/bin/pip install --no-cache-dir \
+        gguf ftfy accelerate opencv-python-headless imageio-ffmpeg einops \
         hf_transfer huggingface_hub \
         -r /workspace/ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper/requirements.txt \
         -r /workspace/ComfyUI/custom_nodes/ComfyUI-VideoHelperSuite/requirements.txt \
         -r /workspace/ComfyUI/custom_nodes/ComfyUI-KJNodes/requirements.txt
 
-# ── rclone (for R2 model pull on boot) ───────────────────────────────────────
+# ── rclone for R2 model pull on boot ─────────────────────────────────────────
 RUN curl -fsSL https://rclone.org/install.sh | bash
 
-# ── SSH setup (Vast.ai needs SSH access) ─────────────────────────────────────
-RUN mkdir /var/run/sshd && \
-    echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config && \
-    echo 'PasswordAuthentication no' >> /etc/ssh/sshd_config
-
-# ── Entrypoint: inject Vast.ai SSH key then start supervisor ─────────────────
-COPY entrypoint.sh /entrypoint.sh
-RUN sed -i 's/\r//' /entrypoint.sh && chmod +x /entrypoint.sh
-
-# ── Supervisor: manages ComfyUI + SSH as services ────────────────────────────
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# ── Startup hook: pull models from R2 then hand off to vastai/comfy entrypoint
+COPY entrypoint.sh /wan22-entrypoint.sh
+RUN sed -i 's/\r//' /wan22-entrypoint.sh && chmod +x /wan22-entrypoint.sh
 
 WORKDIR /workspace
-EXPOSE 18188 18189 18190 18191 18192 18193 18194 18195 22
-
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/wan22-entrypoint.sh"]
